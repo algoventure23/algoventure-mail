@@ -7,13 +7,15 @@ const {
   API_KEY,
   SMTP_HOST,
   SMTP_PORT = 587,
-  SMTP_SECURE = 'false',
-  SMTP_USER,
-  SMTP_PASS,
-  MAIL_FROM,
+  SMTP_USERNAME,
+  SMTP_PASSWORD,
+  SMTP_ENCRYPTION = 'tls', // tls = STARTTLS (587), ssl = SMTPS (465)
+  SMTP_FROM_EMAIL,
+  SMTP_FROM_NAME,
+  SMTP_DEBUG = '0',
 } = process.env;
 
-const missing = ['API_KEY', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'].filter(
+const missing = ['API_KEY', 'SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD'].filter(
   (k) => !process.env[k]
 );
 if (missing.length) {
@@ -21,12 +23,19 @@ if (missing.length) {
   process.exit(1);
 }
 
+const debugEnabled = Number(SMTP_DEBUG) > 0;
+
 const transporter = nodemailer.createTransport({
   host: SMTP_HOST,
   port: Number(SMTP_PORT),
-  secure: SMTP_SECURE === 'true', // true = port 465 (SMTPS), false = 587 (STARTTLS)
-  auth: { user: SMTP_USER, pass: SMTP_PASS },
+  secure: SMTP_ENCRYPTION === 'ssl',
+  auth: { user: SMTP_USERNAME, pass: SMTP_PASSWORD },
+  logger: debugEnabled,
+  debug: debugEnabled,
 });
+
+const fromEmail = SMTP_FROM_EMAIL || SMTP_USERNAME;
+const defaultFrom = SMTP_FROM_NAME ? `"${SMTP_FROM_NAME}" <${fromEmail}>` : fromEmail;
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -60,7 +69,7 @@ app.post('/send', async (req, res) => {
 
   try {
     const info = await transporter.sendMail({
-      from: MAIL_FROM || SMTP_USER,
+      from: defaultFrom,
       to,
       cc,
       bcc,
