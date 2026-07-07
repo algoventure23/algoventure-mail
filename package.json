@@ -1,0 +1,17 @@
+{
+  "name": "mail-relay",
+  "version": "1.0.0",
+  "description": "Minimal SMTP email relay - accepts HTTP requests and sends email via SMTP configured in env",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "nodemailer": "^9.0.3"
+  }
+}
