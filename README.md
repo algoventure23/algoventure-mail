@@ -32,12 +32,19 @@ Header：`X-API-Key: <你的 API_KEY>`，`Content-Type: application/json`
 
 | 字段 | 必填 | 说明 |
 |---|---|---|
+| `smtpUsername` | 是 | 发信邮箱账号（完整邮箱地址） |
+| `smtpPassword` | 是 | 发信邮箱密码 / 授权码 |
 | `to` | 是 | 收件人，字符串或数组 |
 | `subject` | 是 | 主题 |
 | `text` | text/html 二选一 | 纯文本正文 |
 | `html` | text/html 二选一 | HTML 正文 |
 | `cc` / `bcc` / `replyTo` | 否 | 抄送 / 密送 / 回复地址 |
+| `fromEmail` | 否 | 显示的发件邮箱，不传则用 `smtpUsername` |
+| `fromName` | 否 | 显示的发件人名称 |
+| `smtpHost` / `smtpPort` / `smtpEncryption` | 否 | 覆盖 `.env` 里的默认 SMTP 连接设置 |
 | `attachments` | 否 | `[{ "filename": "a.pdf", "content": "<base64>", "encoding": "base64" }]` |
+
+> 邮箱账号密码不再存在 relay 的 `.env` 里，而是每次请求由调用方传入，这样一个 relay 可以代发多个邮箱。
 
 成功响应：
 
@@ -61,7 +68,7 @@ Header：`X-API-Key: <你的 API_KEY>`，`Content-Type: application/json`
 curl -X POST http://<hostinger-vps-ip>:3000/send \
   -H "X-API-Key: <API_KEY>" \
   -H "Content-Type: application/json" \
-  -d '{"to":"someone@example.com","subject":"Test","text":"Hello from relay"}'
+  -d '{"smtpUsername":"user@email.com","smtpPassword":"password","to":"someone@example.com","subject":"Test","text":"Hello from relay"}'
 ```
 
 Node.js:

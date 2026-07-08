@@ -7,35 +7,19 @@ const {
   API_KEY,
   SMTP_HOST,
   SMTP_PORT = 587,
-  SMTP_USERNAME,
-  SMTP_PASSWORD,
   SMTP_ENCRYPTION = 'tls', // tls = STARTTLS (587), ssl = SMTPS (465)
-  SMTP_FROM_EMAIL,
-  SMTP_FROM_NAME,
   SMTP_DEBUG = '0',
 } = process.env;
 
-const missing = ['API_KEY', 'SMTP_HOST', 'SMTP_USERNAME', 'SMTP_PASSWORD'].filter(
-  (k) => !process.env[k]
-);
+// Only connection defaults live in env now — mailbox credentials (username/password)
+// arrive per-request so one relay can send as multiple mailboxes.
+const missing = ['API_KEY', 'SMTP_HOST'].filter((k) => !process.env[k]);
 if (missing.length) {
   console.error(`Missing required env variables: ${missing.join(', ')}`);
   process.exit(1);
 }
 
 const debugEnabled = Number(SMTP_DEBUG) > 0;
-
-const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: Number(SMTP_PORT),
-  secure: SMTP_ENCRYPTION === 'ssl',
-  auth: { user: SMTP_USERNAME, pass: SMTP_PASSWORD },
-  logger: debugEnabled,
-  debug: debugEnabled,
-});
-
-const fromEmail = SMTP_FROM_EMAIL || SMTP_USERNAME;
-const defaultFrom = SMTP_FROM_NAME ? `"${SMTP_FROM_NAME}" <${fromEmail}>` : fromEmail;
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -55,8 +39,18 @@ app.get('/health', (req, res) => {
 });
 
 app.post('/send', async (req, res) => {
-  const { to, subject, text, html, cc, bcc, replyTo, attachments } = req.body || {};
+  const {
+    to, subject, text, html, cc, bcc, replyTo, attachments,
+    smtpUsername, smtpPassword, smtpHost, smtpPort, smtpEncryption,
+    fromEmail, fromName,
+  } = req.body || {};
 
+  if (!smtpUsername || !smtpPassword) {
+    return res.status(400).json({
+      success: false,
+      error: 'Fields "smtpUsername" and "smtpPassword" are required',
+    });
+  }
   if (!to) {
     return res.status(400).json({ success: false, error: 'Field "to" is required' });
   }
@@ -67,9 +61,20 @@ app.post('/send', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Either "text" or "html" is required' });
   }
 
+  const transporter = nodemailer.createTransport({
+    host: smtpHost || SMTP_HOST,
+    port: Number(smtpPort || SMTP_PORT),
+    secure: (smtpEncryption || SMTP_ENCRYPTION) === 'ssl',
+    auth: { user: smtpUsername, pass: smtpPassword },
+    logger: debugEnabled,
+    debug: debugEnabled,
+  });
+
+  const from = fromName ? `"${fromName}" <${fromEmail || smtpUsername}>` : (fromEmail || smtpUsername);
+
   try {
     const info = await transporter.sendMail({
-      from: defaultFrom,
+      from,
       to,
       cc,
       bcc,
@@ -103,12 +108,4 @@ app.use((req, res) => {
 
 app.listen(Number(PORT), () => {
   console.log(`Mail relay listening on port ${PORT}`);
-  // Verify SMTP connection at startup so config errors surface immediately
-  transporter.verify((err) => {
-    if (err) {
-      console.error('SMTP verify failed:', err.message);
-    } else {
-      console.log(`SMTP connection to ${SMTP_HOST}:${SMTP_PORT} OK`);
-    }
-  });
 });
